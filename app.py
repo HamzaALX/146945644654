@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for
+from flask import Flask, render_template, request, send_file
 import os
 from pdf2docx import Converter
+from urllib.request import urlopen
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -29,36 +30,23 @@ def pdf_to_word():
     if not file_url:
         return {'error': 'No file_url provided'}, 400
     
-@app.route('/pdf_to_word', methods=['GET', 'POST'])
-def pdf_to_word():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return render_template('pdf_to_word.html', error='No file part')
+    try:
+        # Download the PDF file from the provided URL
+        pdf_filename = os.path.join(app.config['UPLOAD_FOLDER'], 'temp.pdf')
+        with urlopen(file_url) as response, open(pdf_filename, 'wb') as out_file:
+            out_file.write(response.read())
+        
+        # Convert PDF to Word
+        word_filename = os.path.join(app.config['CONVERTED_FOLDER'], 'converted.docx')
+        cv = Converter(pdf_filename)
+        cv.convert(word_filename, start=0, end=None)
+        cv.close()
 
-        file = request.files['file']
-        if file.filename == '':
-            return render_template('pdf_to_word.html', error='No selected file')
+        # Return the converted Word file for download
+        return send_file(word_filename, as_attachment=True)
 
-        if file and allowed_file(file.filename):
-            # Save the uploaded file
-            filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(filename)
-
-            # Convert PDF to Word
-            word_filename = os.path.join(app.config['CONVERTED_FOLDER'], file.filename.replace('.pdf', '.docx'))
-            cv = Converter(filename)
-            cv.convert(word_filename, start=0, end=None)
-            cv.close()
-
-            # Return the converted Word file for download
-            return send_file(word_filename, as_attachment=True)
-
-    return render_template('pdf_to_word.html')
-
-@app.route('/download/<path:filename>')
-def download_file(filename):
-    return send_file(filename, as_attachment=True)
-
+    except Exception as e:
+        return {'error': str(e)}, 500
 
 if __name__ == '__main__':
     app.run(debug=True)
