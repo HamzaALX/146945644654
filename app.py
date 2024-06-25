@@ -22,6 +22,13 @@ def allowed_file(filename):
 def index():
     return render_template('index.html')
 
+@app.route('/api/pdf_to_word', methods=['POST'])
+def pdf_to_word():
+    data = request.get_json()
+    file_url = data.get('file_url')
+    if not file_url:
+        return {'error': 'No file_url provided'}, 400
+    
 @app.route('/pdf_to_word', methods=['GET', 'POST'])
 def pdf_to_word():
     if request.method == 'POST':
